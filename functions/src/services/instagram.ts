@@ -33,7 +33,7 @@ export async function fetchInstagramPosts(
     },
     body: JSON.stringify({
       usernames: [username],
-      resultsLimit: 100,
+      resultsLimit: 200,
     }),
   });
 
