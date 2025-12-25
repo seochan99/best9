@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // collageQueue - 읽기만 허용 (생성은 Cloud Functions)
+    match /collageQueue/{queueId} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
