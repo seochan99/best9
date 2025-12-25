@@ -83,11 +83,26 @@ export async function fetchInstagramPosts(
   }
 
   if (!result || result.length === 0) {
-    throw new Error('No data returned from Instagram');
+    throw new Error('Account not found. Please check the username.');
   }
 
   // 프로필 데이터 파싱
   const profile = result[0];
+
+  // 계정 존재하지 않음
+  if (!profile || profile.error) {
+    throw new Error('Account not found. Please check the username.');
+  }
+
+  // 비공개 계정 체크
+  if (profile.private === true || profile.isPrivate === true) {
+    throw new Error('This account is private. Please use a public account.');
+  }
+
+  // 게시물이 없는 경우
+  if (!profile.latestPosts || profile.latestPosts.length === 0) {
+    throw new Error('No posts found on this account.');
+  }
 
   // 연도별 필터링
   const startOfYear = new Date(year, 0, 1);

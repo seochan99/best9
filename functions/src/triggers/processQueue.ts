@@ -38,11 +38,7 @@ export const processQueue = onDocumentCreated({
       queueData.year
     );
 
-    if (instagramData.posts.length < 9) {
-      throw new Error(`Only ${instagramData.posts.length} posts found. Need at least 9 posts.`);
-    }
-
-    // 상위 9개 선택 (좋아요 기준)
+    // 상위 9개 선택 (좋아요 기준) - 9개 미만이어도 진행
     const top9 = instagramData.posts
       .sort((a, b) => b.likes - a.likes)
       .slice(0, 9);
