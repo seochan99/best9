@@ -25,7 +25,7 @@ export const createCollage = onRequest({
   }
 
   try {
-    const { instagramUsername, year = 2025 } = req.body;
+    const { instagramUsername, year = 2025, showOverlay = true } = req.body ?? {};
 
     if (!instagramUsername || typeof instagramUsername !== 'string') {
       res.status(400).json({ error: 'Instagram username is required' });
@@ -39,6 +39,17 @@ export const createCollage = onRequest({
       return;
     }
 
+    if (typeof showOverlay !== 'boolean') {
+      res.status(400).json({ error: 'showOverlay must be a boolean' });
+      return;
+    }
+
+    const parsedYear = Number(year);
+    if (!Number.isInteger(parsedYear) || parsedYear < 2000 || parsedYear > 2100) {
+      res.status(400).json({ error: 'Invalid year' });
+      return;
+    }
+
     const queueId = nanoid(16);
     const now = Timestamp.now();
     const expireAt = Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
@@ -46,7 +57,8 @@ export const createCollage = onRequest({
     const queueDoc = {
       id: queueId,
       instagramUsername: cleanUsername,
-      year,
+      year: parsedYear,
+      showOverlay,
       status: 'pending',
       progress: 0,
       statusMessage: 'Waiting...',

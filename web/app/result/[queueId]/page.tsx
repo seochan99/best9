@@ -133,6 +133,7 @@ export default function ResultPage() {
 
     try {
       const response = await fetch(status.result.resultUrl);
+      if (!response.ok) throw new Error("Image fetch failed");
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -144,6 +145,14 @@ export default function ResultPage() {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Download failed:", err);
+      const a = document.createElement("a");
+      a.href = status.result.resultUrl;
+      a.download = `best9_${status.instagramUsername}_2025.jpg`;
+      a.target = "_blank";
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
   };
 
@@ -171,6 +180,37 @@ export default function ResultPage() {
     }
   };
 
+  const handleInstagramShare = async () => {
+    if (!status?.result?.resultUrl) return;
+
+    analytics.share(status.instagramUsername);
+
+    if (navigator.share && navigator.canShare) {
+      try {
+        const response = await fetch(status.result.resultUrl);
+        if (!response.ok) throw new Error("Image fetch failed");
+        const blob = await response.blob();
+        const file = new File(
+          [blob],
+          `2025-best9-${status.instagramUsername}.jpg`,
+          { type: blob.type || "image/jpeg" }
+        );
+
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: `@${status.instagramUsername}'s Best 9`,
+            text: "Check out my Best 9 of 2025!",
+          });
+          return;
+        }
+      } catch (err) {
+        console.error("Instagram share failed:", err);
+      }
+    }
+
+    window.open(status.result.resultUrl, "_blank", "noopener,noreferrer");
+  };
   const shareToTwitter = () => {
     const text = `Check out my Best 9 of 2025! @${status?.instagramUsername}`;
     const url = window.location.href;
@@ -381,6 +421,17 @@ export default function ResultPage() {
           <div className="mt-4">
             <p className="text-center text-neutral-400 text-xs mb-3">Share to</p>
             <div className="flex justify-center gap-3">
+              {/* Instagram */}
+              <button
+                onClick={handleInstagramShare}
+                className="w-12 h-12 flex items-center justify-center rounded-full bg-neutral-100 hover:bg-neutral-200 transition-colors"
+                title="Share to Instagram"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M7 3h10a4 4 0 014 4v10a4 4 0 01-4 4H7a4 4 0 01-4-4V7a4 4 0 014-4zm10 2H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2zm-5 3.5a4.5 4.5 0 110 9 4.5 4.5 0 010-9zm0 2a2.5 2.5 0 100 5 2.5 2.5 0 000-5zm5.25-2.75a1 1 0 11-2 0 1 1 0 012 0z" />
+                </svg>
+              </button>
+
               {/* Twitter/X */}
               <button
                 onClick={shareToTwitter}

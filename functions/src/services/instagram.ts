@@ -112,19 +112,26 @@ export async function fetchInstagramPosts(
 
   const posts: InstagramPost[] = (profile.latestPosts || [])
     .filter((post: Record<string, unknown>) => {
-      if (!post.timestamp) return true; // 타임스탬프 없으면 포함
+      if (!post.timestamp) return false; // 타임스탬프 없으면 제외
       const postDate = new Date(post.timestamp as string);
       return postDate >= startOfYear && postDate <= endOfYear;
     })
-    .map((post: Record<string, unknown>) => ({
-      id: (post.id || post.shortCode || '') as string,
-      imageUrl: (post.displayUrl || post.url || '') as string,
-      likes: (post.likesCount || post.likes || 0) as number,
-      comments: (post.commentsCount || post.comments || 0) as number,
-      timestamp: post.timestamp ? new Date(post.timestamp as string) : new Date(),
-      isVideo: (post.isVideo || post.type === 'Video' || post.type === 'Reel') as boolean,
-      views: (post.videoViewCount || post.viewCount || post.views || 0) as number,
-    }))
+    .map((post: Record<string, unknown>) => {
+      const viewCandidates = [post.videoViewCount, post.viewCount, post.views];
+      const rawViews = viewCandidates.find(
+        (value) => typeof value === 'number' && Number.isFinite(value)
+      );
+
+      return {
+        id: (post.id || post.shortCode || '') as string,
+        imageUrl: (post.displayUrl || post.url || '') as string,
+        likes: (post.likesCount || post.likes || 0) as number,
+        comments: (post.commentsCount || post.comments || 0) as number,
+        timestamp: post.timestamp ? new Date(post.timestamp as string) : new Date(),
+        isVideo: (post.isVideo || post.type === 'Video' || post.type === 'Reel') as boolean,
+        views: typeof rawViews === 'number' ? rawViews : undefined,
+      };
+    })
     .filter((post: InstagramPost) => post.imageUrl);
 
   const totalLikes = posts.reduce((sum, p) => sum + p.likes, 0);

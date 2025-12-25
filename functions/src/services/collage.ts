@@ -11,6 +11,7 @@ interface CollageOptions {
   username: string;
   year: number;
   totalLikes: number;
+  showOverlay?: boolean;
 }
 
 // Format number with K/M suffix
@@ -37,8 +38,10 @@ function createPlaceholderSvg(cell: number): Buffer {
 
 // Create like/view overlay for each image
 function createStatsOverlay(cell: number, likes: number, isVideo: boolean, views?: number): Buffer {
-  const displayNum = isVideo && views ? views : likes;
-  const icon = isVideo && views ? '▶' : '♥';
+  const viewValue = typeof views === 'number' ? views : Number.NaN;
+  const hasViews = isVideo && Number.isFinite(viewValue);
+  const displayNum = hasViews ? viewValue : likes;
+  const icon = hasViews ? '▶' : '♥';
 
   return Buffer.from(`
     <svg width="${cell}" height="${cell}">
@@ -62,6 +65,7 @@ export async function generateCollage(
   posts: PostData[],
   options: CollageOptions
 ): Promise<Buffer> {
+  const showOverlay = options.showOverlay !== false;
   // Polaroid style dimensions
   const PHOTO_SIZE = 1080;
   const BORDER = 40;
@@ -88,19 +92,22 @@ export async function generateCollage(
           .resize(CELL, CELL, { fit: 'cover', position: 'center' })
           .toBuffer();
 
-        // Add stats overlay
-        const statsOverlay = createStatsOverlay(
-          CELL,
-          posts[i].likes,
-          posts[i].isVideo || false,
-          posts[i].views
-        );
+        if (showOverlay) {
+          const statsOverlay = createStatsOverlay(
+            CELL,
+            posts[i].likes,
+            posts[i].isVideo || false,
+            posts[i].views
+          );
 
-        const withStats = await sharp(resized)
-          .composite([{ input: statsOverlay, left: 0, top: 0 }])
-          .toBuffer();
+          const withStats = await sharp(resized)
+            .composite([{ input: statsOverlay, left: 0, top: 0 }])
+            .toBuffer();
 
-        images.push(withStats);
+          images.push(withStats);
+        } else {
+          images.push(resized);
+        }
       } catch (error) {
         console.error(`Failed to process image ${i}:`, error);
         const placeholder = await sharp(createPlaceholderSvg(CELL))
@@ -152,7 +159,7 @@ export async function generateCollage(
             text-anchor="end"
             font-family="'Helvetica Neue', Arial, sans-serif"
             font-size="24" font-weight="700" fill="#1a1a1a">
-        Best9
+        ${options.year} Best9
       </text>
       <text x="${TOTAL_WIDTH - BORDER - 10}" y="${PHOTO_SIZE + BORDER + 100}"
             text-anchor="end"

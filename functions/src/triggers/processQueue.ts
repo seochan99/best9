@@ -38,9 +38,15 @@ export const processQueue = onDocumentCreated({
       queueData.year
     );
 
-    // 상위 9개 선택 (좋아요 기준) - 9개 미만이어도 진행
+    // 상위 9개 선택 (영상=조회수, 사진=좋아요) - 9개 미만이어도 진행
     const top9 = instagramData.posts
-      .sort((a, b) => b.likes - a.likes)
+      .sort((a, b) => {
+        const viewA = a.views ?? Number.NaN;
+        const viewB = b.views ?? Number.NaN;
+        const scoreA = a.isVideo && Number.isFinite(viewA) ? viewA : a.likes;
+        const scoreB = b.isVideo && Number.isFinite(viewB) ? viewB : b.likes;
+        return scoreB - scoreA;
+      })
       .slice(0, 9);
 
     // 상태 업데이트: processing
@@ -63,6 +69,7 @@ export const processQueue = onDocumentCreated({
         username: instagramData.username,
         year: queueData.year,
         totalLikes: instagramData.totalLikes,
+        showOverlay: queueData.showOverlay ?? true,
       }
     );
 
