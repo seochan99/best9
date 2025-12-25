@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import * as PortOne from "@portone/browser-sdk/v2";
-import { analytics } from "../../../lib/analytics";
+import { analytics } from "../../_lib/analytics";
 
 interface StatusData {
   queueId: string;
