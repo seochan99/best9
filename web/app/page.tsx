@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { analytics } from "@/lib/analytics";
 
 interface Stats {
   totalGenerated: number;
@@ -59,6 +60,7 @@ export default function Home() {
         throw new Error(data.error || "Something went wrong");
       }
 
+      analytics.generateStart(cleanUsername);
       router.push(`/result/${data.queueId}`);
     } catch (err) {
       setError((err as Error).message);

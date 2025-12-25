@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
+import * as PortOne from "@portone/browser-sdk/v2";
+import { analytics } from "@/lib/analytics";
 
 interface StatusData {
   queueId: string;
@@ -10,12 +12,17 @@ interface StatusData {
   progress: number;
   statusMessage: string;
   instagramUsername: string;
+  queuePosition: number;
+  totalInQueue: number;
+  isPriority: boolean;
   result?: {
     resultUrl: string;
     totalLikes: number;
   };
   error?: string;
 }
+
+const SKIP_QUEUE_PRICE = 1000; // 1,000 KRW
 
 export default function ResultPage() {
   const params = useParams();
@@ -24,35 +31,105 @@ export default function ResultPage() {
 
   const [status, setStatus] = useState<StatusData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isPaymentLoading, setIsPaymentLoading] = useState(false);
+  const completionTracked = useRef(false);
+
+  const pollStatus = useCallback(async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const response = await fetch(`${apiUrl}/getStatus?queueId=${queueId}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to get status");
+      }
+
+      setStatus(data);
+
+      if (data.status === "completed" && !completionTracked.current) {
+        completionTracked.current = true;
+        analytics.generateComplete(data.instagramUsername, data.result?.totalLikes || 0);
+      }
+
+      if (data.status === "failed" && !completionTracked.current) {
+        completionTracked.current = true;
+        analytics.generateFailed(data.instagramUsername, data.error || "Unknown error");
+      }
+
+      if (data.status === "completed" || data.status === "failed") {
+        return;
+      }
+
+      setTimeout(pollStatus, 2000);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }, [queueId]);
 
   useEffect(() => {
-    const pollStatus = async () => {
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
-        const response = await fetch(`${apiUrl}/getStatus?queueId=${queueId}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || "Failed to get status");
-        }
-
-        setStatus(data);
-
-        if (data.status === "completed" || data.status === "failed") {
-          return;
-        }
-
-        setTimeout(pollStatus, 2000);
-      } catch (err) {
-        setError((err as Error).message);
-      }
-    };
-
     pollStatus();
-  }, [queueId]);
+  }, [pollStatus]);
+
+  const handleSkipQueue = async () => {
+    const storeId = process.env.NEXT_PUBLIC_PORTONE_STORE_ID;
+    const channelKey = process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY;
+
+    if (!storeId || !channelKey) {
+      alert("Payment is not configured");
+      return;
+    }
+
+    setIsPaymentLoading(true);
+
+    try {
+      const paymentId = `payment-${queueId}-${Date.now()}`;
+
+      const response = await PortOne.requestPayment({
+        storeId,
+        channelKey,
+        paymentId,
+        orderName: "Skip Queue - Insta Best 9",
+        totalAmount: SKIP_QUEUE_PRICE,
+        currency: "CURRENCY_KRW",
+        payMethod: "CARD",
+        customer: {
+          customerId: queueId,
+        },
+      });
+
+      if (response?.code) {
+        throw new Error(response.message || "Payment failed");
+      }
+
+      // Verify payment on server
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const verifyResponse = await fetch(`${apiUrl}/processPayment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paymentId: response?.paymentId,
+          queueId,
+        }),
+      });
+
+      if (!verifyResponse.ok) {
+        throw new Error("Payment verification failed");
+      }
+
+      // Refresh status
+      await pollStatus();
+    } catch (err) {
+      console.error("Payment error:", err);
+      alert((err as Error).message || "Payment failed");
+    } finally {
+      setIsPaymentLoading(false);
+    }
+  };
 
   const handleDownload = async () => {
     if (!status?.result?.resultUrl) return;
+
+    analytics.download(status.instagramUsername);
 
     try {
       const response = await fetch(status.result.resultUrl);
@@ -72,6 +149,7 @@ export default function ResultPage() {
 
   const handleShare = async () => {
     if (navigator.share && status?.result?.resultUrl) {
+      analytics.share(status.instagramUsername);
       try {
         await navigator.share({
           title: `@${status.instagramUsername}'s Best 9`,
@@ -82,6 +160,14 @@ export default function ResultPage() {
         console.error("Share failed:", err);
       }
     }
+  };
+
+  const getEstimatedTime = (position: number) => {
+    const secondsPerItem = 30;
+    const totalSeconds = position * secondsPerItem;
+    if (totalSeconds < 60) return `~${totalSeconds}s`;
+    const minutes = Math.ceil(totalSeconds / 60);
+    return `~${minutes} min`;
   };
 
   // Error state
@@ -107,21 +193,24 @@ export default function ResultPage() {
   // Loading state
   if (!status || status.status !== "completed") {
     const getStatusText = () => {
+      if (status?.isPriority) return "Priority processing";
       switch (status?.status) {
         case "fetching":
           return "Finding your posts";
         case "processing":
           return "Creating collage";
         default:
-          return "Getting ready";
+          return "In queue";
       }
     };
+
+    const showQueueInfo = status?.status === "pending" && status.queuePosition > 0;
 
     return (
       <div className="min-h-screen flex flex-col bg-white">
         <main className="flex-1 flex flex-col items-center justify-center px-6">
           <div className="w-full max-w-xs text-center">
-            {/* Loading dots */}
+            {/* Loading animation */}
             <div className="flex justify-center gap-1.5 mb-8">
               <div className="w-2 h-2 bg-neutral-900 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
               <div className="w-2 h-2 bg-neutral-900 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
@@ -133,9 +222,62 @@ export default function ResultPage() {
             </p>
 
             {status?.instagramUsername && (
-              <p className="text-neutral-400 text-sm">
+              <p className="text-neutral-400 text-sm mb-4">
                 @{status.instagramUsername}
               </p>
+            )}
+
+            {/* Queue position info */}
+            {showQueueInfo && !status.isPriority && (
+              <div className="bg-neutral-50 rounded-2xl p-4 mb-6">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-neutral-500 text-sm">Queue position</span>
+                  <span className="font-bold text-lg">
+                    #{status.queuePosition}
+                    <span className="text-neutral-400 text-sm font-normal">
+                      {" "}/ {status.totalInQueue}
+                    </span>
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-neutral-500 text-sm">Est. wait</span>
+                  <span className="font-medium">
+                    {getEstimatedTime(status.queuePosition)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Priority badge */}
+            {status?.isPriority && (
+              <div className="inline-flex items-center gap-1.5 bg-neutral-900 text-white px-3 py-1.5 rounded-full text-sm mb-6">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+                Priority
+              </div>
+            )}
+
+            {/* Skip queue button */}
+            {showQueueInfo && !status.isPriority && status.queuePosition > 1 && (
+              <button
+                onClick={handleSkipQueue}
+                disabled={isPaymentLoading}
+                className="w-full py-4 bg-neutral-900 text-white font-semibold rounded-2xl
+                         hover:bg-black active:scale-[0.98] transition-all
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isPaymentLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  </span>
+                ) : (
+                  <>Skip Queue · ₩{SKIP_QUEUE_PRICE.toLocaleString()}</>
+                )}
+              </button>
             )}
 
             {status?.status === "failed" && (
@@ -151,6 +293,20 @@ export default function ResultPage() {
             )}
           </div>
         </main>
+
+        <footer className="py-6">
+          <p className="text-center text-neutral-300 text-xs">
+            made by{" "}
+            <a
+              href="https://www.instagram.com/dev_seochan/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-neutral-400 hover:text-neutral-900 transition-colors"
+            >
+              @seochan
+            </a>
+          </p>
+        </footer>
       </div>
     );
   }
@@ -160,12 +316,10 @@ export default function ResultPage() {
     <div className="min-h-screen flex flex-col bg-white">
       <main className="flex-1 flex flex-col items-center px-4 py-8">
         <div className="w-full max-w-sm">
-          {/* Username */}
           <p className="text-center text-neutral-400 text-sm mb-3">
             @{status.instagramUsername}
           </p>
 
-          {/* Collage Image */}
           <div className="relative rounded-2xl overflow-hidden bg-neutral-100 shadow-xl mb-6">
             <Image
               src={status.result!.resultUrl}
@@ -178,7 +332,6 @@ export default function ResultPage() {
             />
           </div>
 
-          {/* Stats */}
           <div className="text-center mb-8">
             <span className="text-3xl font-bold">
               {formatNumber(status.result!.totalLikes)}
@@ -186,7 +339,6 @@ export default function ResultPage() {
             <span className="text-neutral-400 text-lg ml-2">likes</span>
           </div>
 
-          {/* Actions */}
           <div className="flex gap-3">
             <button
               onClick={handleDownload}
@@ -205,7 +357,6 @@ export default function ResultPage() {
             </button>
           </div>
 
-          {/* Create new */}
           <button
             onClick={() => router.push("/")}
             className="w-full py-4 mt-3 text-neutral-400 text-sm hover:text-neutral-900 transition-colors"
@@ -215,7 +366,6 @@ export default function ResultPage() {
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="py-6">
         <p className="text-center text-neutral-300 text-xs">
           made by{" "}

@@ -40,12 +40,33 @@ export const getStatus = onRequest({
 
     const queueData = queueDoc.data()!;
 
+    // Calculate queue position
+    let queuePosition = 0;
+    let totalInQueue = 0;
+    if (queueData.status === 'pending') {
+      const pendingDocs = await db.collection('collageQueue')
+        .where('status', '==', 'pending')
+        .where('createdAt', '<', queueData.createdAt)
+        .count()
+        .get();
+      queuePosition = pendingDocs.data().count + 1;
+
+      const totalPending = await db.collection('collageQueue')
+        .where('status', '==', 'pending')
+        .count()
+        .get();
+      totalInQueue = totalPending.data().count;
+    }
+
     const response: Record<string, unknown> = {
       queueId,
       status: queueData.status,
       progress: queueData.progress,
       statusMessage: queueData.statusMessage,
       instagramUsername: queueData.instagramUsername,
+      queuePosition,
+      totalInQueue,
+      isPriority: queueData.priority || false,
     };
 
     if (queueData.status === 'completed') {

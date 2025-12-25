@@ -28,7 +28,7 @@ export const processQueue = onDocumentCreated({
     await queueRef.update({
       status: 'fetching',
       progress: 20,
-      statusMessage: 'Instagram 데이터 가져오는 중...',
+      statusMessage: 'Fetching your posts...',
       updatedAt: Timestamp.now(),
     });
 
@@ -39,7 +39,7 @@ export const processQueue = onDocumentCreated({
     );
 
     if (instagramData.posts.length < 9) {
-      throw new Error(`게시물이 ${instagramData.posts.length}개뿐입니다. 최소 9개가 필요합니다.`);
+      throw new Error(`Only ${instagramData.posts.length} posts found. Need at least 9 posts.`);
     }
 
     // 상위 9개 선택 (좋아요 기준)
@@ -51,7 +51,7 @@ export const processQueue = onDocumentCreated({
     await queueRef.update({
       status: 'processing',
       progress: 50,
-      statusMessage: '콜라주 생성 중...',
+      statusMessage: 'Creating your collage...',
       updatedAt: Timestamp.now(),
     });
 
@@ -68,12 +68,12 @@ export const processQueue = onDocumentCreated({
     // 상태 업데이트: uploading
     await queueRef.update({
       progress: 80,
-      statusMessage: '이미지 저장 중...',
+      statusMessage: 'Saving your image...',
       updatedAt: Timestamp.now(),
     });
 
     // Storage에 업로드
-    const bucket = storage.bucket();
+    const bucket = storage.bucket('best9-dac3e.firebasestorage.app');
     const fileName = `collages/${queueId}.jpg`;
     const file = bucket.file(fileName);
 
@@ -91,7 +91,7 @@ export const processQueue = onDocumentCreated({
     await queueRef.update({
       status: 'completed',
       progress: 100,
-      statusMessage: '완료!',
+      statusMessage: 'Done!',
       resultUrl,
       totalLikes: instagramData.totalLikes,
       updatedAt: Timestamp.now(),
@@ -109,7 +109,7 @@ export const processQueue = onDocumentCreated({
 
     await queueRef.update({
       status: 'failed',
-      statusMessage: '콜라주 생성에 실패했습니다.',
+      statusMessage: 'Failed to create collage',
       errorMessage: (error as Error).message,
       updatedAt: Timestamp.now(),
     });
