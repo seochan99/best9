@@ -1,4 +1,5 @@
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { defineSecret } from 'firebase-functions/params';
 import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { fetchInstagramPosts, APIFY_API_KEY } from '../services/instagram';
@@ -6,6 +7,37 @@ import { generateCollage } from '../services/collage';
 
 const db = getFirestore();
 const storage = getStorage();
+const SLACK_WEBHOOK_URL = defineSecret('SLACK_WEBHOOK_URL');
+
+async function sendSlackNotification(username: string, totalLikes: number, resultUrl: string) {
+  const webhookUrl = SLACK_WEBHOOK_URL.value();
+  if (!webhookUrl) return;
+
+  try {
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `*New Best9 Created!* :tada:\n\n*Username:* @${username}\n*Total Likes:* ${totalLikes.toLocaleString()}`,
+            },
+          },
+          {
+            type: 'image',
+            image_url: resultUrl,
+            alt_text: `${username}'s Best9`,
+          },
+        ],
+      }),
+    });
+  } catch (e) {
+    console.error('Slack notification failed:', e);
+  }
+}
 
 export const processQueue = onDocumentCreated({
   document: 'collageQueue/{queueId}',
@@ -15,7 +47,7 @@ export const processQueue = onDocumentCreated({
   minInstances: 0,
   maxInstances: 10,
   region: 'us-central1',
-  secrets: [APIFY_API_KEY],
+  secrets: [APIFY_API_KEY, SLACK_WEBHOOK_URL],
 }, async (event) => {
   const queueId = event.params.queueId;
   const queueRef = db.collection('collageQueue').doc(queueId);
@@ -109,6 +141,13 @@ export const processQueue = onDocumentCreated({
     await db.collection('stats').doc('global').set({
       totalGenerated: FieldValue.increment(1),
     }, { merge: true });
+
+    // Slack 알림
+    await sendSlackNotification(
+      instagramData.username,
+      instagramData.totalLikes,
+      resultUrl
+    );
 
     console.log(`Collage created successfully for ${queueData.instagramUsername}`);
 
