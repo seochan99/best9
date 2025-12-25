@@ -70,6 +70,14 @@ export const processQueue = onDocumentCreated({
       queueData.year
     );
 
+    // 디버그 로깅
+    console.log(`[${queueData.instagramUsername}] Total posts fetched: ${instagramData.posts.length}`);
+    console.log(`[${queueData.instagramUsername}] Sample posts:`, instagramData.posts.slice(0, 3).map(p => ({
+      likes: p.likes,
+      views: p.views,
+      isVideo: p.isVideo,
+    })));
+
     // 상위 9개 선택 (영상=조회수, 사진=좋아요) - 9개 미만이어도 진행
     const top9 = instagramData.posts
       .sort((a, b) => {
@@ -80,6 +88,13 @@ export const processQueue = onDocumentCreated({
         return scoreB - scoreA;
       })
       .slice(0, 9);
+
+    console.log(`[${queueData.instagramUsername}] Top 9 selected:`, top9.map(p => ({
+      likes: p.likes,
+      views: p.views,
+      isVideo: p.isVideo,
+      score: p.isVideo && p.views ? p.views : p.likes,
+    })));
 
     // 상태 업데이트: processing
     await queueRef.update({

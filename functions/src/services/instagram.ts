@@ -117,15 +117,20 @@ export async function fetchInstagramPosts(
       return postDate >= startOfYear && postDate <= endOfYear;
     })
     .map((post: Record<string, unknown>) => {
+      // 조회수 추출 (양수만)
       const viewCandidates = [post.videoViewCount, post.viewCount, post.views];
       const rawViews = viewCandidates.find(
-        (value) => typeof value === 'number' && Number.isFinite(value)
+        (value) => typeof value === 'number' && Number.isFinite(value) && value > 0
       );
+
+      // 좋아요 추출 (-1은 숨김 처리된 것이므로 0으로)
+      const rawLikes = post.likesCount ?? post.likes ?? 0;
+      const likes = typeof rawLikes === 'number' && rawLikes > 0 ? rawLikes : 0;
 
       return {
         id: (post.id || post.shortCode || '') as string,
         imageUrl: (post.displayUrl || post.url || '') as string,
-        likes: (post.likesCount || post.likes || 0) as number,
+        likes,
         comments: (post.commentsCount || post.comments || 0) as number,
         timestamp: post.timestamp ? new Date(post.timestamp as string) : new Date(),
         isVideo: (post.isVideo || post.type === 'Video' || post.type === 'Reel') as boolean,
