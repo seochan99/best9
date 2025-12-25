@@ -8,6 +8,8 @@ export interface InstagramPost {
   likes: number;
   comments: number;
   timestamp: Date;
+  isVideo?: boolean;
+  views?: number;
 }
 
 export interface InstagramData {
@@ -120,6 +122,8 @@ export async function fetchInstagramPosts(
       likes: (post.likesCount || post.likes || 0) as number,
       comments: (post.commentsCount || post.comments || 0) as number,
       timestamp: post.timestamp ? new Date(post.timestamp as string) : new Date(),
+      isVideo: (post.isVideo || post.type === 'Video' || post.type === 'Reel') as boolean,
+      views: (post.videoViewCount || post.viewCount || post.views || 0) as number,
     }))
     .filter((post: InstagramPost) => post.imageUrl);
 

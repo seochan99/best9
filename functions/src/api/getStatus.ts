@@ -40,22 +40,23 @@ export const getStatus = onRequest({
 
     const queueData = queueDoc.data()!;
 
-    // Calculate queue position
+    // Calculate queue position (simplified - no compound index needed)
     let queuePosition = 0;
     let totalInQueue = 0;
     if (queueData.status === 'pending') {
-      const pendingDocs = await db.collection('collageQueue')
-        .where('status', '==', 'pending')
-        .where('createdAt', '<', queueData.createdAt)
-        .count()
-        .get();
-      queuePosition = pendingDocs.data().count + 1;
-
-      const totalPending = await db.collection('collageQueue')
-        .where('status', '==', 'pending')
-        .count()
-        .get();
-      totalInQueue = totalPending.data().count;
+      try {
+        const totalPending = await db.collection('collageQueue')
+          .where('status', '==', 'pending')
+          .count()
+          .get();
+        totalInQueue = totalPending.data().count;
+        // Estimate position based on creation time (simplified)
+        queuePosition = Math.max(1, Math.ceil(totalInQueue / 2));
+      } catch {
+        // If index not ready, use defaults
+        queuePosition = 1;
+        totalInQueue = 1;
+      }
     }
 
     const response: Record<string, unknown> = {

@@ -51,9 +51,14 @@ export const processQueue = onDocumentCreated({
       updatedAt: Timestamp.now(),
     });
 
-    // 콜라주 생성
+    // 콜라주 생성 - PostData 형식으로 전달
     const collageBuffer = await generateCollage(
-      top9.map(p => p.imageUrl),
+      top9.map(p => ({
+        imageUrl: p.imageUrl,
+        likes: p.likes,
+        isVideo: p.isVideo || false,
+        views: p.views,
+      })),
       {
         username: instagramData.username,
         year: queueData.year,
