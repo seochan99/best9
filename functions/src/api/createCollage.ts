@@ -50,6 +50,28 @@ export const createCollage = onRequest({
       return;
     }
 
+    // 이미 완료된 콜라주가 있는지 확인 (같은 username + year + showOverlay)
+    const existingQuery = await db.collection('collageQueue')
+      .where('instagramUsername', '==', cleanUsername)
+      .where('year', '==', parsedYear)
+      .where('showOverlay', '==', showOverlay)
+      .where('status', '==', 'completed')
+      .orderBy('createdAt', 'desc')
+      .limit(1)
+      .get();
+
+    if (!existingQuery.empty) {
+      const existingDoc = existingQuery.docs[0];
+      console.log(`[Cache Hit] Returning existing collage for @${cleanUsername}`);
+      res.status(200).json({
+        success: true,
+        queueId: existingDoc.id,
+        status: 'completed',
+        cached: true,
+      });
+      return;
+    }
+
     const queueId = nanoid(16);
     const now = Timestamp.now();
     const expireAt = Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
@@ -73,6 +95,7 @@ export const createCollage = onRequest({
       success: true,
       queueId,
       status: 'pending',
+      cached: false,
     });
 
   } catch (error) {

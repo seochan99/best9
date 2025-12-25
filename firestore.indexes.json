@@ -1,5 +1,17 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "collageQueue",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "instagramUsername", "order": "ASCENDING" },
+        { "fieldPath": "year", "order": "ASCENDING" },
+        { "fieldPath": "showOverlay", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": [
     {
       "collectionGroup": "collageQueue",
