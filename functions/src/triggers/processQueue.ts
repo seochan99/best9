@@ -9,7 +9,7 @@ const db = getFirestore();
 const storage = getStorage();
 const SLACK_WEBHOOK_URL = defineSecret('SLACK_WEBHOOK_URL');
 
-async function sendSlackNotification(username: string, totalLikes: number, resultUrl: string) {
+async function sendSlackNotification(username: string, totalLikes: number, resultUrl: string, generatedCount: number) {
   const webhookUrl = SLACK_WEBHOOK_URL.value();
   if (!webhookUrl) return;
 
@@ -23,7 +23,7 @@ async function sendSlackNotification(username: string, totalLikes: number, resul
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: `*New Best9 Created!* :tada:\n\n*Username:* @${username}\n*Total Likes:* ${totalLikes.toLocaleString()}`,
+              text: `*#${generatedCount} Best9 Created!* :tada:\n\n*Username:* @${username}\n*Total Likes:* ${totalLikes.toLocaleString()}`,
             },
           },
           {
@@ -142,11 +142,16 @@ export const processQueue = onDocumentCreated({
       totalGenerated: FieldValue.increment(1),
     }, { merge: true });
 
+    // 업데이트된 통계 가져오기
+    const statsDoc = await db.collection('stats').doc('global').get();
+    const generatedCount = statsDoc.data()?.totalGenerated || 1;
+
     // Slack 알림
     await sendSlackNotification(
       instagramData.username,
       instagramData.totalLikes,
-      resultUrl
+      resultUrl,
+      generatedCount
     );
 
     console.log(`Collage created successfully for ${queueData.instagramUsername}`);
