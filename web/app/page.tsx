@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { analytics } from "../lib/analytics";
+import { analytics } from "@/lib/analytics";
 
 interface Stats {
   totalGenerated: number;
