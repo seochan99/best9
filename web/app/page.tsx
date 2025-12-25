@@ -84,7 +84,7 @@ export default function Home() {
               2025
             </p>
             <h1 className="text-2xl font-bold tracking-tight text-neutral-600">
-              2025 Best9
+              Instagram Best9
             </h1>
             <p className="text-neutral-400 text-sm mt-3">
               Your top 9 posts this year
