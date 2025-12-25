@@ -151,24 +151,24 @@ export default function Home() {
             </button>
           </form>
 
-          {/* Stats */}
-          {stats && (
-            <div className="flex justify-center gap-6 mt-8 pt-6 border-t border-neutral-100">
-              <div className="text-center">
-                <p className="text-lg font-bold">{formatNumber(stats.totalGenerated)}</p>
-                <p className="text-xs text-neutral-400">generated</p>
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-bold">{formatNumber(stats.totalVisits)}</p>
-                <p className="text-xs text-neutral-400">visits</p>
-              </div>
-            </div>
-          )}
-
           {/* Subtext */}
           <p className="text-center text-neutral-300 text-xs mt-6">
             Public accounts only
           </p>
+
+          {/* Stats - fade in when loaded */}
+          <div className={`flex justify-center gap-6 mt-4 pt-4 border-t border-neutral-100
+                          transition-all duration-500 ease-out
+                          ${stats ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
+            <div className="text-center">
+              <p className="text-lg font-bold">{stats ? formatNumber(stats.totalGenerated) : '-'}</p>
+              <p className="text-xs text-neutral-400">generated</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-bold">{stats ? formatNumber(stats.totalVisits) : '-'}</p>
+              <p className="text-xs text-neutral-400">visits</p>
+            </div>
+          </div>
         </div>
       </main>
 
